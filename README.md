@@ -96,6 +96,7 @@ interprocedural analysis. See [Known limitations](#known-limitations) and the
 - [Quick start](#quick-start)
 - [What it checks](#what-it-checks)
 - [GitHub Actions](#github-actions)
+- [Local GUI (optional)](#local-gui-optional)
 - [Everyday commands](#everyday-commands)
 - [What gets scanned](#what-gets-scanned)
 - [Reports and redaction](#reports-and-redaction)
@@ -203,6 +204,50 @@ with a published tag or reviewed commit SHA.
 
 ---
 
+## Local GUI (optional)
+
+Commit Guard includes a local-only web control center. It is a thin layer over
+the same engine used by hooks and CI, so results never diverge. No extra
+dependencies, no cloud service, and no telemetry.
+
+```bash
+./commit-guard gui              # opens http://127.0.0.1:8765/?t=<one-time-token>
+./commit-guard gui --no-open    # just start the server
+./commit-guard gui --port 0     # pick a free port
+./commit-guard gui --report-only --report-path out/report.html
+```
+
+If you installed the package with pip, use `commit-guard-gui --repo .`.
+
+What you can control from the page:
+
+| Area | Actions |
+|---|---|
+| Scan | Staged / whole tree / history / revision range, threshold, baseline, cache, placeholders, dependency graph, SCA, secret visibility, strict/soft-fail, annotations, and fix preview/apply. |
+| Fixes | Preview rule-provided before/after fixes, select individual fixes, apply and stage them, preview PR inline suggestions. |
+| Pull requests | Create or update a report PR, or post inline suggestions to an existing PR (token stays in page memory). |
+| Baseline | Add current findings, owner/expiry metadata, per-finding suppression, and stale-suppression audits. |
+| Git | Status, diffs, staging, commits, fetch/pull/push, branch create/switch/delete, recent commits, and a recent-history doctor. |
+| Rules | Search active rules, inspect patterns, validate the rule pack, and download/update opt-in gitleaks or YAML packs. |
+| Reports | Download HTML, JSON, SARIF, JUnit, GitLab, Checkstyle, or Markdown from the last scan. |
+| Maintenance | Status, doctor, install/repair, update, enable/disable hook, init config, uninstall. |
+| Configuration | Edit `.commit_guard.toml` with validation and a one-file backup. |
+
+Safety defaults: the server binds to `127.0.0.1`, every request needs a per-run
+token, the `Host` header is validated, secret values stay redacted unless you
+explicitly opt in, and GitHub actions require a token you provide per session.
+The GUI is opt-in — hooks and CI keep using the CLI and never start a server.
+The page follows your system theme (with a light/dark switch), works on mobile,
+and tabs are deep-linkable with hashes such as `#git` or `#rules`.
+Rule downloads happen only when you click the button; they use public
+HTTP(S) hosts, are capped at 5 MB, validated before enabling, and keep a
+backup of the replaced file.
+
+For CI, the GUI's HTML report is the artifact equivalent. See
+[CI integrations](docs/CI.md#html-dashboard-artifact).
+
+---
+
 ## Everyday commands
 
 Run these from inside an installed repository:
@@ -210,6 +255,7 @@ Run these from inside an installed repository:
 | Command | What it does |
 |---|---|
 | `./commit-guard scan` | Manual scan of staged changes. |
+| `./commit-guard gui` | Open the local web control center. |
 | `./commit-guard status` | Version, rule count, hook state, config/baseline state. |
 | `./commit-guard doctor` | Diagnose git/Python/PyYAML/rules/hook problems. |
 | `./commit-guard init` | Write a commented `.commit_guard.toml`. |
@@ -462,6 +508,22 @@ Add `context` to a native rule when a line only matters near another line:
 
 Validate all rules and corpus samples with `./commit-guard check-rules`; inspect
 one rule with `./commit-guard explain cg-python-eval`.
+
+### Downloading rule packs
+
+The GUI **Rules** tab can fetch opt-in packs without adding a runtime
+dependency:
+
+- **Gitleaks upstream (TOML)** updates the gitleaks rule file.
+- **Semgrep YAML** installs regex-compatible rules under `rules/semgrep_rules/`;
+  AST-only rules remain skipped.
+- **Commit Guard native YAML** installs rules under `rules/custom/`.
+
+Downloads use public HTTP(S) hosts only, reject credentials and private/local
+addresses, cap responses at 5 MB, and time out. The new file is validated by
+the rule loader before it is enabled; on failure the previous file is restored.
+A `.bak` copy is kept when replacing an existing pack. Nothing is downloaded
+unless you click **Download & enable**.
 
 See [docs/RULES.md](docs/RULES.md) for the full native schema, gitleaks field
 mapping, entropy semantics, context windows, and semgrep limitations.

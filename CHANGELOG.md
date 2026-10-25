@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Optional local web control center (`./commit-guard gui`, `commit-guard-gui`):
+  scan modes, severity filters, safe-fix preview/apply with per-finding
+  selection, baseline management, rule explorer, configuration editor,
+  maintenance actions, report downloads, report pull requests, and inline PR
+  suggestions.
+- GUI server binds to loopback, requires a per-run token, validates the `Host`
+  header, caps request bodies, and keeps secrets redacted by default.
+- GUI Git workspace: status/diffs, stage/unstage, commit, fetch/pull/push,
+  branch create/switch/delete, recent log, and a recent-history doctor.
+- GUI dependency graph preview/save and advanced scan controls for strict,
+  soft-fail, GitHub annotations, verbose rules, custom config/rules/baseline,
+  no-config, fix preview/apply, and SCA snapshot/timeout.
+- Opt-in rule-pack downloads in the GUI: gitleaks TOML, Semgrep-compatible
+  YAML, and native YAML. Downloads are validated, size/timeout capped, backed
+  up before replacement, and rolled back when they add no usable regex rules.
+- `gui`, `gui --report-only`, and `scan --format html` in the installed
+  manager; the installer copies the GUI modules into `.commit_guard/`.
+- GitHub Action accepts `format: html` and exposes an `html-report` output.
+- Tests for GUI actions, HTTP routes/security, fix application, and installer
+  integration.
+
+### Changed
+
+- Redesigned the local GUI with a responsive sidebar, page-aware headers,
+  light/dark themes, accessible focus states, consistent cards, sticky table
+  headers, mobile layouts, and deep-linkable tabs.
+- `scan --format html` is now accepted by the installed `./commit-guard scan`
+  wrapper (it was already supported by `main.py`).
+
 ## 2.1.0
 
 ### Added
