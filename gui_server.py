@@ -223,6 +223,15 @@ def _make_handler(state: AppState, token: str):
                 if path == "/api/reports":
                     self._send_json(actions.list_reports(query.get("repo") or state.repo or ""))
                     return
+                if path == "/api/triage":
+                    self._send_json(actions.triage_state(query.get("repo") or state.repo or ""))
+                    return
+                if path == "/api/policy":
+                    self._send_json(actions.policy_summary(query.get("repo") or state.repo or ""))
+                    return
+                if path == "/api/pipelines":
+                    self._send_json(actions.list_pipelines(query.get("repo") or state.repo or ""))
+                    return
                 if path == "/api/reports/download":
                     self._serve_report(query.get("repo") or state.repo or "", query.get("name") or "")
                     return
@@ -251,6 +260,25 @@ def _make_handler(state: AppState, token: str):
                             staged=query.get("staged") in ("1", "true", "yes"),
                             path=query.get("path") or None,
                         )
+                    )
+                    return
+                if path == "/api/git/show":
+                    ref = query.get("ref") or ""
+                    if not ref:
+                        self._send_error_json("A commit reference is required.", 400)
+                        return
+                    self._send_json(
+                        actions.git_show(query.get("repo") or state.repo or "", ref)
+                    )
+                    return
+                if path == "/api/git/stashes":
+                    self._send_json(
+                        actions.git_stash_list(query.get("repo") or state.repo or "")
+                    )
+                    return
+                if path == "/api/git/tags":
+                    self._send_json(
+                        actions.git_tag_list(query.get("repo") or state.repo or "")
                     )
                     return
                 self._send_error_json("Not found.", 404)
@@ -320,6 +348,60 @@ def _make_handler(state: AppState, token: str):
                     result = actions.run_scan(repo, options, engine=state.engine, timeout=state.timeout)
                     state.remember(result["repo"], result["report"], options)
                     self._send_json(result)
+                finally:
+                    self._unlock()
+                return
+
+            if path == "/api/policy/gate":
+                report = payload.get("report") or state.report
+                if not isinstance(report, dict):
+                    raise actions.ActionError("Run a scan first.")
+                options = payload.get("options") or {}
+                if not isinstance(options, dict):
+                    raise actions.ActionError("Policy options must be an object.")
+                self._send_json(
+                    actions.policy_gate(self._repo(payload), report, options)
+                )
+                return
+
+            if path == "/api/pipelines/run":
+                if not self._lock():
+                    return
+                try:
+                    self._send_json(
+                        actions.run_pipeline(
+                            self._repo(payload),
+                            str(payload.get("name") or ""),
+                        )
+                    )
+                finally:
+                    self._unlock()
+                return
+
+            if path == "/api/triage/audit":
+                report = payload.get("report") or state.report
+                if not isinstance(report, dict):
+                    raise actions.ActionError("Run a scan first.")
+                self._send_json(
+                    actions.triage_audit(self._repo(payload), report)
+                )
+                return
+
+            if path == "/api/triage":
+                options = payload.get("options") or {}
+                if not isinstance(options, dict):
+                    raise actions.ActionError("Triage options must be an object.")
+                if not self._lock():
+                    return
+                try:
+                    self._send_json(
+                        actions.triage_set(
+                            self._repo(payload),
+                            str(payload.get("fingerprint") or ""),
+                            str(payload.get("state") or ""),
+                            options,
+                        )
+                    )
                 finally:
                     self._unlock()
                 return
@@ -605,6 +687,82 @@ def _make_handler(state: AppState, token: str):
                     result = actions.git_unstage(
                         repo, paths, all_files=bool(payload.get("all"))
                     )
+                elif path == "/api/git/restore":
+                    result = actions.git_restore(
+                        repo, paths, all_files=bool(payload.get("all"))
+                    )
+                elif path == "/api/git/clean":
+                    result = actions.git_clean(
+                        repo,
+                        paths,
+                        confirm=str(payload.get("confirm") or ""),
+                    )
+                elif path == "/api/git/stash":
+                    result = actions.git_stash_push(
+                        repo,
+                        str(payload.get("message") or ""),
+                        include_untracked=bool(payload.get("include_untracked")),
+                        keep_index=bool(payload.get("keep_index")),
+                    )
+                elif path == "/api/git/stash/pop":
+                    result = actions.git_stash_pop(
+                        repo, payload.get("index") or 0
+                    )
+                elif path == "/api/git/stash/drop":
+                    result = actions.git_stash_drop(
+                        repo, payload.get("index") or 0
+                    )
+                elif path == "/api/git/apply":
+                    result = actions.git_apply_patch(
+                        repo,
+                        str(payload.get("patch") or ""),
+                        cached=bool(payload.get("cached")),
+                        reverse=bool(payload.get("reverse")),
+                    )
+                elif path == "/api/git/reset":
+                    result = actions.git_reset(
+                        repo,
+                        str(payload.get("ref") or ""),
+                        mode=str(payload.get("mode") or "mixed"),
+                        confirm=str(payload.get("confirm") or ""),
+                    )
+                elif path == "/api/git/revert":
+                    result = actions.git_revert(
+                        repo, str(payload.get("ref") or "")
+                    )
+                elif path == "/api/git/cherry-pick":
+                    result = actions.git_cherry_pick(
+                        repo, str(payload.get("ref") or "")
+                    )
+                elif path == "/api/git/tags/create":
+                    result = actions.git_tag_create(
+                        repo,
+                        str(payload.get("name") or ""),
+                        ref=str(payload.get("ref") or ""),
+                        message=str(payload.get("message") or ""),
+                    )
+                elif path == "/api/git/tags/delete":
+                    result = actions.git_tag_delete(
+                        repo, str(payload.get("name") or "")
+                    )
+                elif path == "/api/git/merge":
+                    result = actions.git_merge(
+                        repo,
+                        str(payload.get("branch") or ""),
+                        no_ff=bool(payload.get("no_ff")),
+                    )
+                elif path == "/api/git/rebase":
+                    result = actions.git_rebase(
+                        repo, str(payload.get("onto") or "")
+                    )
+                elif path == "/api/git/branches/rename":
+                    result = actions.git_branch_rename(
+                        repo,
+                        str(payload.get("old") or ""),
+                        str(payload.get("new") or ""),
+                    )
+                elif path == "/api/git/abort":
+                    result = actions.git_abort(repo)
                 elif path == "/api/git/commit":
                     result = actions.git_commit(
                         repo,

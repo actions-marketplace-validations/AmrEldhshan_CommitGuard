@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -116,6 +118,49 @@ class GuiActionTests(unittest.TestCase):
         for remote, expected in cases.items():
             self.assertEqual(actions.parse_github_slug(remote), expected, remote)
 
+    def test_policy_triage_and_pipeline_actions(self):
+        config = (
+            "[pipelines.smoke]\ncommand = "
+            + json.dumps([sys.executable, "-c", "print('smoke')"])
+            + "\ncategory = 'test'\ntimeout = 30\n"
+        )
+        (self.root / ".commit_guard.toml").write_text(config, encoding="utf-8")
+        summary = actions.policy_summary(self.root)
+        self.assertEqual(summary["policy"]["profile"], "balanced")
+        pipelines = actions.list_pipelines(self.root)
+        self.assertEqual([item["name"] for item in pipelines["configured"]], ["smoke"])
+        run = actions.run_pipeline(self.root, "smoke")
+        self.assertTrue(run["result"]["ok"])
+        self.assertIn("smoke", run["result"]["stdout"])
+
+        saved = actions.triage_set(
+            self.root,
+            "fingerprint-1",
+            "accepted",
+            {
+                "owner": "@team",
+                "reason": "Accepted test fixture.",
+                "ticket": "SEC-1",
+                "expires": "2099-01-01",
+            },
+        )
+        self.assertEqual(saved["entries"][0]["state"], "accepted")
+        audit = actions.triage_audit(
+            self.root,
+            {
+                "findings": [
+                    {
+                        "file": "app.py",
+                        "line": 1,
+                        "rule_id": "test-rule",
+                        "severity": "high",
+                        "fingerprint": "fingerprint-1",
+                    }
+                ]
+            },
+        )
+        self.assertEqual(audit["issues"], [])
+
     @unittest.skipUnless(GIT, "git is required")
     def test_build_scan_command_modes_and_flags(self):
         engine = self.root / "main.py"
@@ -148,6 +193,9 @@ class GuiActionTests(unittest.TestCase):
                 "sca_online": True,
                 "sca_snapshot": "osv.json",
                 "sca_timeout": 7,
+                "gate": True,
+                "policy_path": "policy.toml",
+                "policy_profile": "audit",
             },
         )
         for flag in (
@@ -159,10 +207,13 @@ class GuiActionTests(unittest.TestCase):
             "--dep-graph",
             "--sca",
             "--sca-online",
+            "--gate",
         ):
             self.assertIn(flag, full)
         self.assertEqual(full[full.index("--dep-graph-format") + 1], "json")
         self.assertEqual(full[full.index("--sca-timeout") + 1], "7")
+        self.assertEqual(full[full.index("--policy") + 1], "policy.toml")
+        self.assertEqual(full[full.index("--policy-profile") + 1], "audit")
         with self.assertRaises(actions.ActionError):
             actions.build_scan_command(engine, self.root, report, {"mode": "nope"})
         with self.assertRaises(actions.ActionError):
@@ -209,6 +260,8 @@ class GuiActionTests(unittest.TestCase):
         self.assertTrue((self.root / ".commit_guard.toml.bak").is_file())
         with self.assertRaises(actions.ActionError):
             actions.config_save(self.root, '[scan]\nthreshold = "bogus"\n')
+        with self.assertRaises(actions.ActionError):
+            actions.config_save(self.root, "[pipelines.bad]\ncommand = []\n")
         restored = actions.config_restore(self.root)
         self.assertEqual(restored["summary"]["threshold"], "medium")
 
@@ -350,6 +403,40 @@ class GuiFixTests(unittest.TestCase):
             check=False,
         )
         self.assertIn("yaml.safe_load", staged.stdout)
+
+    @unittest.skipUnless(GIT, "git is required")
+    def test_policy_gate_and_triage_actions(self):
+        from core.reporter import build_json_report
+        from core.scanner import Finding
+
+        finding = Finding(
+            file="app.py",
+            line_number=1,
+            rule_id="cg-test",
+            description="test",
+            severity="high",
+            source="custom",
+            flagged_code="test",
+            redacted_code="test",
+            fingerprint="aaaaaaaaaaaaaaaa",
+        )
+        report = __import__("json").loads(build_json_report([finding], "info"))
+        result = actions.policy_gate(self.root, report)
+        self.assertFalse(result["gate"]["passed"])
+        actions.triage_set(
+            self.root,
+            "aaaaaaaaaaaaaaaa",
+            "accepted",
+            {
+                "owner": "@team",
+                "reason": "Accepted fixture finding with tracked ticket.",
+                "expires": "2099-01-01",
+            },
+        )
+        result = actions.policy_gate(self.root, report)
+        self.assertTrue(result["gate"]["passed"])
+        listed = actions.triage_state(self.root)
+        self.assertEqual(len(listed["entries"]), 1)
 
     def test_inline_suggestions_preview(self):
         engine = TOOLKIT / "main.py"

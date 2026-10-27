@@ -4,6 +4,34 @@
 
 ### Added
 
+- Commit Guard 3.0 preview: JSON schema v3 with stable IDs, engine/category/
+  confidence metadata, spans, fixes, references, code flows, and provenance.
+- Engine protocol, timeout-isolated parallel runner, deterministic dedupe, and
+  built-in `regex` and `ast` engine adapters.
+- Policy v1 with `strict`, `balanced`, and `audit` profiles, severity/rate
+  budgets, new-code gating, baseline ratchet, and expired-triage handling.
+- Committed triage state in `.commit_guard/triage.yaml`.
+- SARIF/native ingestion for Semgrep, gitleaks, Trivy, Checkov, and Bandit,
+  plus multi-report merging.
+- CLI commands: `gate`, `ingest`, `report merge`, `policy validate|explain`,
+  and `triage list|set|prune|audit`.
+- `scan --gate` and policy-aware pre-commit/pre-push hooks.
+- Staged-diff benchmark and CI performance regression job.
+- GUI policy-gate and triage actions.
+- Apache-2.0 licensing package: SPDX license metadata, `NOTICE`, and
+  `THIRD_PARTY_NOTICES.md`.
+- Expanded native rule packs to 120+ curated checks across Python,
+  JavaScript/TypeScript, Go, Java, PHP, Ruby, Rust, C/C++, shell, web-server
+  configuration, GitHub Actions, Kubernetes, Terraform, and Docker.
+- `rules/PROVENANCE.yaml` with source, revision, license, retrieval date, and
+  SHA-256 checksums for every bundled rule file. Semgrep packs are marked
+  release-blocked and excluded from release artifacts.
+- `SECURITY.md`, `docs/THREAT_MODEL.md`, and RFC 9116 `security.txt` files with
+  private disclosure instructions and a 90-day coordinated disclosure target.
+- CI matrix for Python 3.11, 3.12, and 3.13 with lint, type checks, tests, rule
+  corpus validation, package build, and release-artifact checks.
+- `docs/NAMING.md` with the PyPI availability record and canonical surface
+  names, plus `docs/BASELINE.md` with the measured 2.1.0 baseline.
 - Optional local web control center (`./commit-guard gui`, `commit-guard-gui`):
   scan modes, severity filters, safe-fix preview/apply with per-finding
   selection, baseline management, rule explorer, configuration editor,
@@ -12,7 +40,12 @@
 - GUI server binds to loopback, requires a per-run token, validates the `Host`
   header, caps request bodies, and keeps secrets redacted by default.
 - GUI Git workspace: status/diffs, stage/unstage, commit, fetch/pull/push,
-  branch create/switch/delete, recent log, and a recent-history doctor.
+  branch create/switch/delete, stash, remotes, quick-command access to tags and
+  advanced operations, recent log, and a recent-history doctor.
+- GUI control-plane expansion: repository overview, policy gate with blocking
+  reasons, committed triage editor/auditor, and a shell-free delivery pipeline
+  console for configured or auto-detected test, lint, type-check, build,
+  security, and deploy commands.
 - GUI dependency graph preview/save and advanced scan controls for strict,
   soft-fail, GitHub annotations, verbose rules, custom config/rules/baseline,
   no-config, fix preview/apply, and SCA snapshot/timeout.
@@ -27,6 +60,15 @@
 
 ### Changed
 
+- Rebuilt the README around the fast, offline-first Local Security Control
+  Plane workflow: pipx quickstart, feature matrix, policy/analyzer model,
+  architecture diagram, privacy model, and maintainer credits.
+- Migrated canonical repository, Action, pre-commit, Pages, release, and
+  security links to the `CommitGuard-Sec` organization.
+- JSON reports now use `schema_version: 3`; SARIF remains 2.1.0 with additional
+  fix/code-flow properties. See `docs/UPGRADE-2.x-to-3.x.md`.
+- GitHub Action gains `gate`, `policy-file`, and `policy-profile` inputs.
+- `core.engines` is included in the wheel and installer copy.
 - Redesigned the local GUI with a responsive sidebar, page-aware headers,
   light/dark themes, accessible focus states, consistent cards, sticky table
   headers, mobile layouts, and deep-linkable tabs.

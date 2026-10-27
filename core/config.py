@@ -32,6 +32,13 @@ Supported schema:
 
     [severity]
     "semgrep-generic-hardcoded-password" = "low"
+
+    [gate]
+    profile = "balanced"        # strict | balanced | audit (for --gate)
+    threshold = "high"
+    fail_on = "new"
+    ratchet = true
+    max_new = { critical = 0, high = 0, medium = 25, low = 100 }
 """
 
 from __future__ import annotations
@@ -39,6 +46,7 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Any, cast
 
 from core.paths import DEFAULT_EXCLUDES
 
@@ -98,7 +106,7 @@ class Config:
         clean = {key: value for key, value in overrides.items() if value is not None}
         if not clean:
             return self
-        return replace(self, **clean)
+        return replace(self, **cast(Any, clean))
 
 
 def _as_str_tuple(value: object, key: str) -> tuple[str, ...]:
@@ -269,6 +277,21 @@ paths = [
 [severity]
 # Raise or lower individual rules.
 # "semgrep-generic-hardcoded-password" = "low"
+
+[gate]
+# Policy v1, used by `scan --gate` and generated hooks.
+profile = "balanced"        # strict | balanced | audit
+threshold = "high"
+fail_on = "new"
+ratchet = true
+max_new = { critical = 0, high = 0, medium = 25, low = 100 }
+
+# [pipelines.test]
+# command = ["python", "-m", "unittest", "discover", "-s", "tests"]
+# category = "test"          # test | lint | typecheck | build | security | deploy | custom
+# timeout = 300              # seconds, 1..3600
+# cwd = "."                  # must stay inside the repository
+# env = { CI = "local" }     # only these keys are added to the inherited environment
 """
 
 
